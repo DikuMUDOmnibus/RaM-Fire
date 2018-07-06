@@ -1,0 +1,927 @@
+081004	Quixadhal
+  2031	Started this HACKLOG file!
+
+	Removed the multiple Makefiles and merged their diffrences into
+	a single Makefile.  The user can simply comment and uncomment
+	the correct lines for their platform.
+
+  	Removed the "make" rule from "make clean", since many times
+	we just want to get rid of the object files and not rebuild.
+
+  	Replaced the old .c.o suffix rule with a modern one, and
+	removed the generic "merc.h" prerequisite.  Instead, I've
+	had gcc generate dependancy information and appended that
+	to the Makefile.  This could be automated, but for simplicity
+	I won't do so.
+  2107	Changed the function name weapon_type() to be weapon_type_lookup().
+
+		merc.h:2194: warning: 'int weapon_type(const char*)' hides
+		constructor for 'struct weapon_type'
+
+	Fixed a variable scope issue in act_obj.c.
+
+		act_obj.c: In function 'void do_buy(CHAR_DATA*, char*)':
+		act_obj.c:2518: warning: declaration of 'buf' shadows a previous local
+		act_obj.c:2506: warning: shadowed declaration is here
+
+	Same thing here.
+
+		act_wiz.c: In function 'void do_mset(CHAR_DATA*, char*)':
+		act_wiz.c:3466: warning: declaration of 'buf' shadows a previous local
+		act_wiz.c:3329: warning: shadowed declaration is here
+
+	This is a local re-declarations of a global variable.
+
+		comm.c: In function 'void bust_a_prompt(CHAR_DATA*)':
+		comm.c:1328: warning: declaration of 'dir_name' shadows a global declaration
+		merc.h:1904: warning: shadowed declaration is here
+
+	In this case, I think the correct answer is to move the local
+	declaration up to act_move.c, and rename it to be dir_abbrev[],
+	since it really needs to always stay in sync with dir_name[].
+
+	And this is just another shadowed global.
+
+		comm.c: In function 'void nanny(DESCRIPTOR_DATA*, char*)':
+		comm.c:1546: warning: declaration of 'd_next' shadows a global declaration
+		comm.c:301: warning: shadowed declaration is here
+
+	Let's try commenting out the global and see if it's really used
+	anywhere.  Hmmmm, mostly just as a local loop variable, only one
+	place seems to want it global, and that doesn't appear to have any
+	effect.
+
+		/* if ( d_next == dclose )
+		       d_next = d_next->next;   */
+
+	That keeps d_next set, but it isn't ever used anywhere else.
+
+  2133	Another shadow...
+
+		db.c: In function 'void load_old_obj(FILE*)':
+		db.c:655: warning: declaration of 'letter' shadows a previous local
+		db.c:595: warning: shadowed declaration is here
+
+	A quick change to is_name() to make it also const char *, and this
+	is fine.
+
+		db.c: In function 'char* get_extra_descr(const char*, EXTRA_DESCR_DATA*)':
+		db.c:2055: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+	This one is a bit ugly.  str_dup() accepts a const char *, but
+	returns a char *.  Normally, not a big deal, but because of the
+	shared string space, it wants to return the source pointer sometimes.
+	THAT now has to be declared without the const, because we won't know
+	ahead of time if it IS const or not.
+
+		db.c: In function 'char* str_dup(const char*)':
+		db.c:2693: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+	Another local shadow...
+
+		db2.c: In function 'void load_objects(FILE*)':
+		db2.c:458: warning: declaration of 'letter' shadows a previous local
+		db2.c:354: warning: shadowed declaration is here
+
+  2159	Meeeeee, and my shaaaaadow!
+
+	You'd think -Wshadow would be part of -Wall by now.... *sigh*
+
+		fight.c: In function 'void one_hit(CHAR_DATA*, CHAR_DATA*, int)':
+		fight.c:587: warning: declaration of 'dam' shadows a previous local
+		fight.c:392: warning: shadowed declaration is here
+
+		fight.c: In function 'void check_killer(CHAR_DATA*, CHAR_DATA*)':
+		fight.c:1218: warning: declaration of 'buf' shadows a previous local
+		fight.c:1194: warning: shadowed declaration is here
+
+	Wheeeee!  handler.c is unhappy!
+
+		handler.c: In function 'bool is_name(const char*, char*)':
+		handler.c:822: error: invalid conversion from 'const char*' to 'char*'
+		handler.c:826: error: invalid conversion from 'const char*' to 'char*'
+		handler.c:826: error:   initializing argument 1 of 'char* one_argument(char*, char*)'
+		cc1plus: warnings being treated as errors
+
+		handler.c: In function 'char* affect_bit_name(int)':
+		handler.c:2614: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* extra_bit_name(int)':
+		handler.c:2622: warning: declaration of 'extra_flags' shadows a global declaration
+		tables.h:74: warning: shadowed declaration is here
+		handler.c:2648: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* act_bit_name(int)':
+		handler.c:2652: warning: declaration of 'act_flags' shadows a global declaration
+		tables.h:66: warning: shadowed declaration is here
+		handler.c:2698: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* comm_bit_name(int)':
+		handler.c:2701: warning: declaration of 'comm_flags' shadows a global declaration
+		tables.h:73: warning: shadowed declaration is here
+		handler.c:2725: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* imm_bit_name(int)':
+		handler.c:2728: warning: declaration of 'imm_flags' shadows a global declaration
+		tables.h:70: warning: shadowed declaration is here
+		handler.c:2757: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* wear_bit_name(int)':
+		handler.c:2760: warning: declaration of 'wear_flags' shadows a global declaration
+		tables.h:75: warning: shadowed declaration is here
+		handler.c:2783: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* form_bit_name(int)':
+		handler.c:2786: warning: declaration of 'form_flags' shadows a global declaration
+		tables.h:71: warning: shadowed declaration is here
+		handler.c:2818: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* part_bit_name(int)':
+		handler.c:2821: warning: declaration of 'part_flags' shadows a global declaration
+		tables.h:72: warning: shadowed declaration is here
+		handler.c:2848: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* weapon_bit_name(int)':
+		handler.c:2851: warning: declaration of 'weapon_flags' shadows a global declaration
+		tables.h:76: warning: shadowed declaration is here
+		handler.c:2865: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* cont_bit_name(int)':
+		handler.c:2879: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+		handler.c: In function 'char* off_bit_name(int)':
+		handler.c:2883: warning: declaration of 'off_flags' shadows a global declaration
+		tables.h:69: warning: shadowed declaration is here
+		handler.c:2911: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+	These were all fixed by redoing the return values so it always
+	returns the buffer, but copies "none" into it where there were no
+	flags.  Also, renamed all the local variables to "vector", since it
+	made sense and eliminated the conflicts.
+
+  2312	Undid the change to is_name(), and also removed the const modifier
+	from get_extra_descr().  Adding proper const flags will need some
+	more carful work.
+
+		save.c: In function 'void fread_char(CHAR_DATA*, FILE*)':
+		save.c:743: warning: cast from type 'const char*' to type 'char*' casts away constness
+		save.c: In function 'void fread_pet(CHAR_DATA*, FILE*)':
+		save.c:1140: warning: cast from type 'const char*' to type 'char*' casts away constness
+		save.c:1162: warning: cast from type 'const char*' to type 'char*' casts away constness
+		save.c: In function 'void fread_obj(CHAR_DATA*, FILE*)':
+		save.c:1364: warning: cast from type 'const char*' to type 'char*' casts away constness
+		save.c:1400: warning: cast from type 'const char*' to type 'char*' casts away constness
+
+	Fixed those by adding a static char buffer which is set to
+	"End" or "END" and returned instead of a constant string.
+
+081006	MacGregor/Nibios
+
+	Taking Quixadhal's fixup_081004 src and adapting to compile with g++ 3.4.6.
+	First pass:  compile dies with these errors and fixes:
+	comm.c: In function `void act_new(const char*, CHAR_DATA*, const void*, const void*, int, int)':
+	comm.c:2443: warning: cast from `const void*' to `CHAR_DATA*' discards qualifiers from pointer target type
+	comm.c:2444: warning: cast from `const void*' to `OBJ_DATA*' discards qualifiers from pointer target type
+	comm.c:2445: warning: cast from `const void*' to `OBJ_DATA*' discards qualifiers from pointer target type
+	comm.c:2512: warning: cast from `const void*' to `char*' discards qualifiers from pointer target type
+	comm.c:2513: warning: cast from `const void*' to `char*' discards qualifiers from pointer target type
+	comm.c:2536: warning: cast from `const void*' to `char*' discards qualifiers from pointer target type
+	comm.c:2542: warning: cast from `const void*' to `char*' discards qualifiers from pointer target type
+	
+	The offending lines:
+	2443:    CHAR_DATA *vch = (CHAR_DATA *) arg2;
+	2444:    OBJ_DATA *obj1 = (OBJ_DATA  *) arg1;
+	2445:    OBJ_DATA *obj2 = (OBJ_DATA  *) arg2;
+	2512:           case 't': i = (char *) arg1;                            break;
+	2513:           case 'T': i = (char *) arg2;                            break;
+	2536:               if ( arg2 == NULL || ((char *) arg2)[0] == '\0' )
+	2542:                   one_argument( (char *) arg2, fname );
+	
+	
+	The first six were pretty straightforward to fix, changing them respectively to:
+	2443:    const CHAR_DATA *vch = (const CHAR_DATA *) arg2;
+	2444:    const OBJ_DATA *obj1 = (const OBJ_DATA  *) arg1;
+	2445:    const OBJ_DATA *obj2 = (const OBJ_DATA  *) arg2;
+	2512:           case 't': i = (const char *) arg1;                      break;
+	2513:           case 'T': i = (const char *) arg2;                      break;
+	2536:               if ( arg2 == NULL || ((const char *) arg2)[0] == '\0' )
+	
+	We'll defer fixing line 2542 for now, and just recompile with what we have.
+	We now get:
+	comm.c: In function `void act_new(const char*, CHAR_DATA*, const void*, const void*, int, int)':
+	comm.c:2515: error: invalid conversion from `const CHAR_DATA*' to `CHAR_DATA*'
+	comm.c:2515: error:   initializing argument 2 of `bool can_see(CHAR_DATA*, CHAR_DATA*)'
+	comm.c:2524: error: invalid conversion from `const OBJ_DATA*' to `OBJ_DATA*'
+	comm.c:2524: error:   initializing argument 2 of `bool can_see_obj(CHAR_DATA*, OBJ_DATA*)'
+	comm.c:2530: error: invalid conversion from `const OBJ_DATA*' to `OBJ_DATA*'
+	comm.c:2530: error:   initializing argument 2 of `bool can_see_obj(CHAR_DATA*, OBJ_DATA*)'
+	comm.c:2542: warning: cast from `const void*' to `char*' discards qualifiers from pointer target type
+	
+	The offending lines:
+	2515:           case 'N': i = PERS( vch, to  );                         break;
+	2524:               i = can_see_obj( to, obj1 )
+	2530:               i = can_see_obj( to, obj2 )
+	2542:                   one_argument( (char *) arg2, fname );
+	
+	The PERS macro takes us to the can_see() function in handler.c. 
+	We change it from
+	bool can_see( CHAR_DATA *ch, CHAR_DATA *victim )
+	to
+	bool can_see( const CHAR_DATA *ch, const CHAR_DATA *victim )
+	
+	This in turn requires changing get_trust(), get_skill() and get_curr_stat() 
+	all to take const CHAR_DATA * arguments instead of CHAR_DATA *.
+	
+	Fixing can_see_obj() is a bit more straightforward since we only have to change
+	its own arguments to const CHAR_DATA * and const OBJ_DATA *.
+	
+	So now the only problem left is line 2542 and its call to one_argument().
+	
+	Changing one_argument() to take a const char * as its first argument, and
+	returning a const char *, is going to open up a huge can of worms.  The
+	Right Thing To Do at this point would be to make the function take a const
+	char * for its first argument, and return a const char *.  This would mean,
+	among other things, that every do_fun would have to take a const char * for
+	their second argument.
+	
+	However this would definitely break about 95% of the existing ROM snippets,
+	and we'd agreed we didn't want to do that. Furthermore, it already compiles
+	just fine with gcc 4.1.x.  So pretty much against my better judgement, I
+	copied one_argument() to a new function get_argument(), with get_argument()
+	taking and returning const char *'s, and changed line 2542 to call the new
+	get_argument() function.
+	
+	Okay, it compiles cleanly now!  Let's try compiling as gcc instead of g++.
+	
+	Whoops!  act_comm.c blows up big time, referencing incomplete data types.
+	The problem is that g++ has its own bool data type and gcc doesn't.  So we
+	add a couple lines in merc.h like so:
+	
+	/*
+	 * Accomodate both gcc and g++
+	 */
+	#if !defined __cplusplus
+	typedef unsigned char   bool;
+	#endif
+	
+	g++ is still happy, and so is gcc until it gets to act_wiz.c:
+	act_wiz.c: In function `do_clone':
+	act_wiz.c:2386: warning: declaration of 'new_obj' shadows a global declaration
+	recycle.h:81: warning: shadowed declaration is here
+	
+	Hmm, wonder why this didn't show up earlier?  Seems to me it should have.
+	Anyway, change the local variable new_obj to cloned_obj and continue.
+	
+	Uh oh, comm.c blows up again, this time over those declarations of system
+	calls at the top of comm.c.  Let's extend the comment around the
+	declarations for accept, bind et al to include the declarations for read,
+	select, etc too.  I think it would be safe to just remove them but I'll do
+	it conservatively.
+	
+	Okay, another shadow problem in db.c, the variable 'exit' in the function
+	do_dump().  Let's change it to pExit.
+	
+	Now we're getting, of all things, this error:
+	handler.c: In function `unequip_char':
+	handler.c:1646: warning: suggest explicit braces to avoid ambiguous `else'
+	We add curley braces around the for loop inside the 'if', and also around
+	the for-loop itself.  Either set resolves the problem, but good practice
+	requires both.
+	
+	Now, finally, it compiles with both g++ and gcc.
+
+081006	Quixadhal
+	Merged in MacGregor's HACKLOG entries
+
+	Added the -Wredundant-declarations flag and fixed a few more warnings.
+	These are typically redefinitions of system routines that are already
+	defined by system include files, and should NOT be done locally.
+
+	Added defines for true/false if we're not C++
+
+081006	Quixadhal
+  2255	Trying to compile with g++ 2.95 now....wheeee!
+		act_info.c: In function `void do_password(CHAR_DATA *, char *)':
+		act_info.c:2726: implicit declaration of function `int crypt(...)'
+		act_info.c:2726: passing `int' to argument 1 of `strcmp(const char *, const char *)' lacks a cast
+		act_info.c:2743: assignment to `char *' from `int' lacks a cast
+
+	Ok, this is because the man page for crypt() LIES!  Yes, that's right....
+	according to man(3), crypt() is defined in unistd.h, but it's actually
+	split off into crypt.h (at least on linux systems).
+
+	So, I've included <crypt.h> in act_info.c and comm.c.
+
+		handler.c: In function `char * item_name(int)':
+		handler.c:188: warning: declaration of `item_type' shadows global declaration
+		handler.c: In function `char * weapon_name(int)':
+		handler.c:198: warning: declaration of `weapon_type' shadows global declaration
+
+	*chocking noises come from the console...*
+	Ok, newer gcc's don't complain here, because they distinguish
+	between functions, type definitions, and variables.  However,
+	I think (a) having any of those with the same name is asking
+	for trouble (unless it's a constructor), and (b) having a
+	a variable named "type" is as bad as one named "class".
+
+	Lines like item_type == item_table[type].type make my eyes bleed.
+
+		In file included from save.c:38:
+		/usr/include/stdlib.h:584: warning: redundant redeclaration of `malloc(unsigned int)' in same scope
+		/usr/include/malloc.h:118: warning: previous declaration of `malloc(unsigned int)'
+		/usr/include/stdlib.h:587: warning: redundant redeclaration of `calloc(unsigned int, unsigned int)' in same scope
+		/usr/include/malloc.h:122: warning: previous declaration of `calloc(unsigned int, unsigned int)'
+		/usr/include/stdlib.h:595: warning: redundant redeclaration of `realloc(void *, unsigned int)' in same scope
+		/usr/include/malloc.h:128: warning: previous declaration of `realloc(void *, unsigned int)'
+		/usr/include/stdlib.h:597: warning: redundant redeclaration of `free(void *)' in same scope
+		/usr/include/malloc.h:131: warning: previous declaration of `free(void *)'
+		/usr/include/stdlib.h:602: warning: redundant redeclaration of `cfree(void *)' in same scope
+		/usr/include/malloc.h:134: warning: previous declaration of `cfree(void *)'
+		In file included from save.c:38:
+		/usr/include/stdlib.h:611: warning: redundant redeclaration of `valloc(unsigned int)' in same scope
+		/usr/include/malloc.h:140: warning: previous declaration of `valloc(unsigned int)'
+
+	Hmmmm, ok.  I'm guessing 2.95 was more picky about the order of 
+	include files.  Commenting out malloc.h should do the trick!
+
+	Interesting!  Switching from g++-2.95 to gcc-2.95 reveals a few new errors too!
+
+		act_info.c: In function `do_exits':
+		act_info.c:1324: warning: redundant redeclaration of `dir_name' in same scope
+		merc.h:1916: warning: previous declaration of `dir_name'
+
+	Several more too.... apparently, the merc folks added extern
+	declarations inside their function bodies... and when the
+	functions got moved around, they shadowed the actual declarations
+	since they now shared the same file.
+
+081007	Quixahdal
+  1024	Oops!  I have no idea where my datestamps came from.  I called the
+	last directory 081008, when it had only just become the 7th.  So,
+	today's is called 081009 and is also a day in the future!  I figure
+	I'll not do stuff in a day or two, and real time will catch up. :)
+
+	In any case, this patch is the big const char * fix for gcc 4.2 and
+	up!  I'm actually using g++ 4.3.2 in a VM, so we're right up there
+	in the modern era.
+
+	A LOT of casting.  A few cases where I had to use local copies so
+	things like smash_tilde() could write to the string.  One very nasty
+	trick in str_dup(), which shouldn't work, but does.
+
+	I won't bother pasting all the errors here, there are way too many
+	of them.  I also added a few flags that MacGregor asked for, although
+	some of them are only available when using the C language.
+
+	I enabled -Wwrite-strings, which is what gcc 4.2 adds to -Wall, so
+	even older compilers should now be grumpy if we miss something.
+
+	I disabled -Wmissing-delcarations by default, because most folks
+	won't have gcc 4.2.x or higher yet.
+
+081008	Quixadhal
+  1244	It should be noted that this revision marks the last that was done
+	outside of version control.  I've set up a local SVN repository
+	and will happily export it in the event of our using one hosted
+	in a central location.  Otherwise, I'll create patches from
+	svn's diff system.
+
+  1356	I've added ID tags to the top of every source file.  These will get
+	filled in by svn with the last time that file was changed and
+	commited, as well as revision numbers, etc.
+
+  2115	Removed all the OS specific things.  I started out stripping the
+	MSDOS and macintosh code.  Once that was done, the majority of
+	all the other OS defines were workarounds for supposedly missing
+	system header definitions.  I've never seen a C compiler for ANY
+	platform (even the Commodore 64!) where a function existed in the
+	system library, but didn't have a header defintion somewhere.
+
+	For historical archiving, I removed:
+
+	MSDOS, macintosh, _AIX, apollo, hpux, MIPS_OS, NeXT, sequent,
+	sun, ultrix, and interactive
+
+	Things that used to be linux or unix are now simply there.  I will
+	make a small effort to see if anything special needs to be done
+	for FreeBSD (which should also cover OS X), but anything else
+	has an audience which should know what they need to do to handle
+	portability issues.
+
+081009	Quixadhal
+  0545	ACK!  I didn't realize that you had to ENABLE token substitution
+	on every file you want svn to perform substitution on.  Ok...
+	New patch just to enable the "Id" keyword on every source file.
+
+	On the upside, it is kindof nice that it doesn't have to check
+	all the data files for substitution values on every checkout.
+
+  0621	Removed all references to fpReserve.  This is from the old days
+	when the number of file descriptors was very limited, and it was
+	fairly common to be unable to open a file because you had too
+	many sockets active.  I can't imagine this is still an issue,
+	even if you have 500 players.  Out it goes!
+
+081010	Quixadhal
+  0928	Working on removing the args() prototyping and replacing it
+	with something a bit simpler.  In the process, I'm also trying
+	to clean up the header files and do a very tiny amount of
+	refactoring to move similar purpose things into similar
+	places.
+
+	TODO -	Fix debug malloc support.  Apparently this is from a
+		very old version of dmalloc.
+
+  1533	I think a serious refactoring of the file layout is long
+	overdue.  The string handling code seems to be scattered
+	between recycle.c and db.c.  wiznet is in the act_wiz.c
+	file, yet really it belongs with the rest of the channels
+	and send_to_char style functions.
+
+	I'm at a point where everything compiles, so I will do a
+	check-in and diff here.  Right now, the stuff I've moved
+	around is pretty minor.
+
+	Here's a list of changes:
+
+	1  Removed telnet.h -- use the system headers, Luke!
+	2  Removed extern function prototypes from all the source
+	   files.
+	3  Added function prototypes for every(!) function in the
+	   header files.
+	4  Created act.h for things related to any of the act_*.c
+	   files.
+	5  Created special.h to hold the spec_proc stuff.
+	6  Merged db2.c into db.c
+	7  Merged magic2.c into magic.c
+	8  Added new include dependancies, since some things are
+	   now in db.h, act.h, or elsewhere that isn't merc.h
+	9  As a result of 2-5, the DECLARE_foo() macros aren't
+	   actually used, although they're still there.  I don't
+	   like them (it's easier to cut and paste declarations,
+	   and then you aren't hiding how they work).
+	10 In the process of doing all the above, removed some
+	   of the inconsistent blank lines.. IE: 3 lines between
+	   foo() and foo2(), but 2 lines between foo2() and foo3().
+
+081012	Davion
+	Fixed up the do_dump() command, which shows memory statistics,
+	to compile cleanly on 64-bit architectures.  Remember to use
+	the %z modifier for printf of things that vary, like size_t
+	or pointers.
+
+081012	Quixadhal
+	I then also changed my hack in str_dup() to use size_t, which
+	works properly on both platforms, whereas unsigned long does
+	not.
+
+081013	Quixadhal
+  1605	Ok, I set out to remove crypt() and free us from the insanity
+	of wondering if a given OS, in a given part of the world,
+	has or doesn't have the archaic crypt() system call.  The
+	simplest way was just to replace it with a known good
+	cryptographic algorithm, and I chose sha256.
+
+	It's free, it can be distributed and doesn't conflict with
+	the DikuMUD license.  It compiles cleanly.  It hasn't been
+	cracked yet (unlike MD5).  All around goodness.
+
+	So, I replaced calls to crypt() with a macro CRYPT().
+
+	If you define NOCRYPT, that macro just returns the string
+	and you get your insecure plain-text junk.  If you don't,
+	it expands to sha256_crypt() and you get a nice medium
+	length string back that works just like the one from
+	crypt did, but better.
+
+	The only downside?  You can't keep your old player files.
+
+	If you really MUST keep your old files, you can go add
+	an extra compare to use crypt(), but I'd rather not
+	support that, because it leaves us in the same boat we
+	just got out of.
+
+	In the process, I found more compiler bugs to squish, and
+	mucked with the Makefile a bit more.  It now detects if
+	you're using gcc and adds the extra flags for you, although
+	I can't do gcc as a prefix match yet.
+
+081014	Quixadhal
+  1348	Another chunk of cleaning, this time I targeted all the cases
+	where the code declared things as "long" or "sh_int" and
+	replaced them with "int" (about 95%) or "size_t".
+
+	This removed another maintenance headache, since while the
+	size of an "int" may vary, it is likely to mean 32-bit on
+	most of today's machines.  OTOH, "long" means 64-bit on
+	brand new machines, but 32-bit on many currently running
+	boxes.  "short" was ok as being 16-bit, but in most of the
+	places it was used, it didn't need to be capped at 32767.
+
+	I have to trundle off the the dentist, but when I get back
+	there are a couple places that make assuptions about data
+	sizes, and they are WRONG anyways!  For example, number_range()
+	returns a signed integer, but it only generates values from 0
+	to what you pass in.
+
+	Apparently the ROM team forgot that when they wrote the
+	horrible get_random_room() function, because it asks for a
+	number betwen 0 and 65535 (even though the room vnum was
+	declared as a signed short int).
+
+	All that needs to be redone... later. :)
+
+081015	Quixadhal
+  2100	This round, I redid get_random_room(), along with a few
+	of the lesser evils, number_percent() and number_door().
+	Why anyone thinks a while() loop that may or may not
+	eventually terminate is a good way to filter random
+	numbers down to the space you want is probably only
+	understandable if drinking the same drink as the author.
+
+	In the process, I also found quite a few places where
+	the number of doors was hard coded and replaced that
+	with a constant, so those folks who want to add the
+	NE/SE/SW/NW directions can do so without errors.
+
+	Also, I discovered that VMware is fairly robust with
+	respect to the OS crashing.  Windows decided to do an
+	automatic update on me (I'm sure I had that set to
+	download only...), and didn't quite totaly succeed so
+	my screenblanker was frozen and required a reboot.
+	
+	That'll teach me for developing on the faster, but less
+	stable machine, eh? :)
+
+081016	Quixadhal
+	No big changes here, just merged act_enter.c into act_move.c
+	because that makes more sense.
+
+081018	Quixadhal
+  1302	Added profiling options back to the Makefile.  I realized
+	though that gmon.out is not generated unless the program
+	exits normally.  Since the game doesn't ship with an
+	immortal character, and it doesn't (YET!) auto-generate
+	one for the first player who logs in, AND it doesn't catch
+	ctrl-C and call exit()... I'll have to fix that!
+
+  1345	Merged lookup.c into flags.c and db.c.  I added a
+	proper_exit stub to comm.c, which I may extend to allow
+	logging information as well.  There are quite a few
+	places that call bug() or log_string() right before exit().
+	There are also places that call perror()... those may need
+	to go away.
+
+	I added the ID tag to the sha256 code, since I forgot it.
+
+  1536	Changed append_file() to allow for a NULL ch, which in
+	turn allows us to use it to write to system logs for things
+	not related to characters.
+
+	Created a proper_exit() functon which uses varargs to allow
+	formatted strings.
+
+	Added a signal handler for SIGINT and SIGTERM, which does
+	a shutdown, which in turn will allow us to do profiling
+	and get to the REAL purpose of today's editing.
+
+  1745	Moved the functions from flags.c and db.c into tables.c, which
+	is a much better place for them.  So, now flags.c also goes
+	away.  Yay!
+
+081019	Quixadhal
+  2301	Removed music.c and music.h, and all the various hooks in the
+	code for it.  I left a few commented out lines in place so that
+	we can load "stock" ROM area files by remembering which bits
+	used to be used for ITEM_JUKEBOX and such.
+
+	I also merged the functions from scan.c into act_info.c which
+	is where do_look() and friends live.
+
+081022	Quixadhal
+  0022	Finally got all code run through indent, and verified multiple
+	times that subsequent runs through indent don't modify anything,
+	as well as making sure everything still compiles. :)
+
+  0025	Added a TODO file to track things that haven't (yet!) been done,
+	but which we don't want to forget about.  Maybe ideas, maybe
+	bugs, maybe just things that don't look right in the code.
+
+081023	Quixadhal
+  1610	Finished porting my bug logging system over to RaM.  The part
+	that sends to immortals logged in probably needs testing, but
+	we'll get there.  Right now, I left skeleton functions for
+	bug() and log_string() in place, but DON'T USE THEM!
+
+	Why not?  Well, in my old MUD, I replaced the stock functions
+	with #define'd macros, and #defines work best because if you
+	use real functions, you can't "trick" the compiler into
+	supplying the FILE/FUNCTION/LINE information automatically.
+
+	In this case, that didn't work here.... Because I use printf
+	argument checking, and ROM code has lots of instances of silly
+	things like bug( "foo foo", 0 ), which I don't feel like
+	correcting at this point in time.  That's for a later pass
+	when I make things into log_boot, log_info, etc...
+
+081024	Quixadhal
+  0342	Finished converting all bug() and log_string() calls to
+	log_error(), log_auth(), log_balance() and log_reset().
+
+	It would probably be good to add a few messages to
+	show progress (IE: log_boot()).
+
+081025	Quixadhal
+  0159	Going through and redoing the actual text of the error
+	messages to be somewhat useful for people who don't live
+	and breathe ROM specific code.  Disk space is much cheaper
+	than developer time!
+
+  0408	Done.  Hopefully this will be a bit cleaner.  I also added
+	a couple of macros from my own game to merc.h, namely
+	NAME() and ONAME() to pick out ch/mob name/short-desc and
+	also return "someone" or "something" if the pointer is
+	NULL.
+
+	DON'T USE THESE for routines that save to disk... having
+	a player suddenly become "someone" is usually not good.
+
+  1934	Added a few bootup messages, and a message to the reset
+	routine.  I also cleaned a couple things up, like
+	renaming the obscure "init_mm" to "init_random", since
+	that's what it does.
+
+	Oh yeah, I added some CLI options.  You can now start
+	tha game with -w for wizlock on, -d../some/path for
+	a starting directory, -p../some/file for a PID file,
+	and -l../some/file to point stderr to a file instead
+	of the screen.
+
+  2031	Renamed a couple more functions, and moved all the
+	actual player-output functions to the bottom of
+	comm.c.
+
+	I did a global search/replace on TRUE and FALSE to
+	make them true and false.  This might not seem to
+	matter, but C++ will use those as real boolean
+	values instead of doing an internal type conversion
+	from int to bool.  For C... it won't matter. :)
+
+  2100	I decided that since I was in search and replace mode,
+	I'd also fix the nagging "\n\r" issue, which the
+	TELNET standard specifies should be "\r\n".  It
+	doesn't hurt to follow the standard, and it does help
+	for some clients that don't do it quite right.
+
+080126	Quixadhal
+  0401	Moved wiznet() from act_wiz.c to comm.c, since it IS
+	communication related, and made it a wrapper for the
+	new wiz_printf().  Also made a new act_printf() that
+	is a rewrite, with act_new() as a wrapper, and act()
+	remaining a define.
+
+  0518	Finished making _printf() functions for all the usual
+	output methods.  I did a little renaming too, as I
+	found the use of descriptor to be inconsistant, and
+	confusing.  From now on, the term descriptor will
+	always refer to a DESCRIPTOR_DATA structure, while
+	a file descriptor will be called a socket.  Thus,
+	we now have write_to_buffer(), which takes a
+	descriptor, write_to_socket(), which takes an
+	integer, and desc_printf() which is the printf
+	version of write_to_buffer().
+
+	HAHA, fixed one minor bug revealed by my newline
+	conversion.  show_string() did a weird check that
+	only worked if lines were ended by CRLF or LFCR, and
+	not for single CR or LF characters.  While it's nice
+	to assume everyone follows the rules, I rewrote it
+	to not care, just in case.
+
+	As with the log functions, this is the first stage
+	of making printf enabled versions.  Replacing the
+	existing ones to clean up all those buffers is
+	work for tomorrow or the next day.
+
+080127	Quixadhal
+  2310	Finished converting wiznet() calls to wiz_printf()
+	calls wherever they used sprintf to a temp buffer.
+	The regular wiznet() calls are fine.
+
+080128	Quixadhal
+  0531	Finished converting act() and act_new(), again where
+	appropriate.  Quite a few places built temporary
+	buffers, but moving the logic into act_printf()
+	would actually make things harder to maintain.
+
+080130	Quixadhal
+  2104	Finished converting some of the write_to_buffer()
+	instances to desc_printf().  More of these are just
+	constant strings, so not many of them converted.  Still,
+	it's good to have the option where it makes sense.
+
+	Now for the biggie.... send_to_char() into ch_printf().
+
+081031	Quixadhal
+  0551	HAPPY HALLOWEEN!!!
+	
+	Finished the _printf() conversions.  Whew!  There are
+	some instances of the original left, because there were
+	a few places that just weren't worth the effort to change.
+	The non-vararg versions aren't "bad", they're just
+	limited, so I'm happy to leave them in place where it makes
+	things simpler.
+
+	An UPPER() that worked on strings would have been nice. :)
+
+081101	Quixadhal
+  0152	A new month, a fresh start, some old code. :)
+
+	This is the last of the major polish runs for our little
+	project.  In this run, I made sure EVERY variable is
+	initialized to some known value (well, I probably missed
+	a few... C99 lets you declare variables inside of blocks
+	instead of all at the top of the function).  While that
+	will do NOTHING for performance, it makes debugging a
+	little nicer, since things are setup when you enter the
+	function, rather than only after some code runs.
+
+	You might note that I set char arrays that are used as
+	string buffers to be "\0\0\0\0\0\0\0".  There IS a reason!
+	It is NOT too much to drink!
+
+	That string constant is eight bytes long, 8 NULL
+	bytes to be precise.  That means if you were to try to
+	dereference said array, it would be a NULL pointer.  I
+	used to use a 4 byte string, but 64-bit compilers and all...
+
+081105	Quixadhal
+  0508	Congrabulations to freshly elected President Barack Obama.
+
+	In other news, I've started digging into the giant bug list.
+	So far, bugs 1-11 have been cleared.
+
+081106	Quixadhal
+  0950	Ugh, somehow some of the formatting got messed up, and I
+	missed a bunch of variable initializations.  Fixed.
+
+081107	Quixadhal
+  0757	Split off the random number stuff and the string handling
+	stuff, adjusting the includes appropriately.  I think the
+	junk in recycle.c should probalby get merged into whatever
+	place the lists in question actually live.
+
+	Oh yeah, the last update patches all the "easy" bugs from
+	the buglist, so we're up to pass 2 now.
+
+  1745	Moved a few things from recycle.c into other places.  I think
+	the next step will be trying to split all that gsn_ crap off
+	into skills.c, where it really belongs.
+
+  1855	Finished removing recycle.c, recycle.h, and effects.c; which
+	have all been refactored into more logical places.
+
+  2046	Deleted a defunct Jukebox (vnum 3200) and all the resets that
+	go along with it from the area files.
+
+081109	Quixadhal
+  1450	Whacked one of the stupid bugs... hard-coding vnums.  Not all
+	of them, of course, but a couple that were listed are no more.
+	If you want Midgaard to be LAW, get off your lazy butt and go
+	set all the rooms to be LAW!
+
+  1645	Nailed another hard-coded 3001... it's now a constant, which
+	is still icky... but not AS icky.
+
+081111	Quixadhal
+  1504	Starting to remove gsn_ and friends... Some spells have both
+	a spell_foo() function AND a gsn_foo variable.
+
+	blindness, charm person, curse, invisibility, mass invisibility,
+	plague, poison, sanctuary, and sleep
+
+	Of those, only blindness and poison seem like things that could
+	be non-spell actions.
+
+081112	Quixadhal
+  1211	Finished removing the gsn_ variables and in the process I converted
+	the skill_lookup() function to a binary search.  Right now, it uses
+	an exact match, although using a prefix might be helpful in some
+	cases.
+
+	I also fixed a couple of bugs I introduced last week. :)
+
+081113	Quixadhal
+  1423	Went back and optimized the skill_lookup() use by caching it where
+	it was used more than once in a function.
+
+  2007	Moved all the player/god character files into subdirs to make it
+	easier to manage when we have thousands of player files. :)
+
+081114	Quixadhal
+  1414	Changed the player load/save system slightly.  It now loads and
+	saves into the players or gods subdirectory, based on if the
+	character is immortal or not.  The former mini-files put into
+	gods were never used, and seemed to serve no purpose, other than
+	logging -- which is already done in the log system.
+
+081116	Quixadhal
+  1442	Ok, I added a new feature, which is disabled by default.  Because
+	we don't ship with an admin character, we need a way to allow
+	folks starting their game up to have an admin without having to
+	jump through the hoops of editing their player files.
+
+	So, I added a -g flag to the command line, which will make the
+	FIRST login become the IMPLEMENTOR level admin.  Note that if
+	you reboot with -g again, that will happen again!
+
+	I also implemented a player list system which, if enabled will
+	also auto-whizz the first login, but in that case it tracks via
+	a player list file, and so only the very first to log in after
+	that feature is enabled (or you delete players.txt) will be
+	granted godhood.
+
+	Even though I think this could be quite useful for things like
+	seeing when your friend last played, or showing a FULL who list
+	of ALL players (including those offline), it could take up quite
+	a bit of memory if you have thousands upon thousands of characters,
+	so it's off by default.
+
+	I also fixed a couple of bugs I missed in my gsn_ removal spree.
+	Apparently the ROM folks couldn't spell, and neither could I. :)
+
+  2257	This marks the effective END of development on the Ice branch of
+	code.  While there are an infinite number of bugs still to fix,
+	and we haven't yet added any of our core features, interest in
+	the C language version of RaM has dwindled to non-existence.
+
+	Since *I* don't feel like doing the same work twice, I'd rather
+	start the conversion to the C++ Fire branch now, and add our
+	core features to it.
+
+	Those who still desire a C version are more than welcome to
+	help back-port our work in the C++ version, but as of tonight
+	no active developers remain to support Ice.  If you find any
+	bugs, do let us know as they might be something we've already
+	fixed and can easily back-port!
+
+	I look forward to seeing everyone in the flames of C++!
+
+  2310	Of course, my last testings before check-in revealed a couple
+	of bugs that only show up in gcc, so those are now fixed as
+	well.  I'm leaving the default compiler set to gcc, since this
+	IS the C branch.  Cheers!
+
+  2355	Welcome to Fire!  This is the new C++ branch of RaM development,
+	and it is our new home.  Pull up a chair and warm yourself in
+	the glow of C++.
+
+081210	Quixadhal
+  1150	A simple change to the Makefile to move dependancy data off
+	into a seperate file.  It just avoids having to cut-and-paste,
+	or having a scary self-modifying setup.
+
+	Yes, I know GNU likes you to use .d files for everything, but
+	I think that's overkill.  If you change what files you have, or
+	what they include, remember to do a make dep first.
+
+  1231	Finally got rid of healer.c (merged into specials.c for now) and
+	merged const.c into tables.c, since they both deal with flags
+	and sets of things that are pre-defined.
+
+081211	Quixadhal
+  0954	Fixed a bug Kaervos spotted where I optimized away clearing some
+	static string buffers, so we got duplicate results.  D'oh!
+
+081226	Quixadhal
+  1958	Ok, this is a big patch, and thanks to Kaervos for most of it!
+	This patch merges in OLC support.  I have to figure out how to
+	test it now.
+
+090102	Quixadhal
+  0240	We're pretty close to having OLC fully functional.  I've added
+	the files and propset on them, but haven't done the commit yet
+	because there are still a couple of little bugs to be nailed.
+
+090104	Quixadhal
+  1913	OK.  I'm not 100% confident of the bug-free nature of our OLC
+	code.  It still needs more testing!  However, I am going to check
+	things in as they are right now.  It seems to compile and run
+	without any problems, so I don't think we've added anything bad.
+
+090105	Quixadhal
+  0816	A few fixes from Ghasetta and Tricky for various compilation issues.
+
+090111	Quixadhal
+  1311	A fix for the rescue command, an OSX fix, and a rewrite of ban.c
+	to use std::string for some things.  More on this later!
+
+  1344	Fixed a bug I introduced when I renamed 'detect invis' and similar
+	to be 'detect invisibility'.  The in-game defined version should
+	always be the longest correct name you can use, and then allow
+	prefixes if you want to be lazy.  I added prefix matching in
+	the skill lookup routine.
+
+	Personally, I don't think it should be there, but as long as we
+	want to support legacy files (grrrr).... :)
+

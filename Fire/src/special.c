@@ -1,0 +1,1295 @@
+/*
+ * RAM $Id: special.c 64 2008-12-11 14:35:49Z quixadhal $
+ */
+
+/***************************************************************************
+ *  Original Diku Mud copyright (C) 1990, 1991 by Sebastian Hammer,        *
+ *  Michael Seifert, Hans Henrik St{rfeldt, Tom Madsen, and Katja Nyboe.   *
+ *                                                                         *
+ *  Merc Diku Mud improvments copyright (C) 1992, 1993 by Michael          *
+ *  Chastain, Michael Quan, and Mitchell Tse.                              *
+ *                                                                         *
+ *  In order to use any part of this Merc Diku Mud, you must comply with   *
+ *  both the original Diku license in 'license.doc' as well the Merc       *
+ *  license in 'license.txt'.  In particular, you may not remove either of *
+ *  these copyright notices.                                               *
+ *                                                                         *
+ *  Much time and thought has gone into this software and you are          *
+ *  benefitting.  We hope that you share your changes too.  What goes      *
+ *  around, comes around.                                                  *
+ ***************************************************************************/
+
+/***************************************************************************
+*       ROM 2.4 is copyright 1993-1998 Russ Taylor                         *
+*       ROM has been brought to you by the ROM consortium                  *
+*           Russ Taylor (rtaylor@hypercube.org)                            *
+*           Gabrielle Taylor (gtaylor@hypercube.org)                       *
+*           Brian Moore (zump@rom.org)                                     *
+*       By using this code, you have agreed to follow the terms of the     *
+*       ROM license, in the file Rom24/doc/rom.license                     *
+***************************************************************************/
+
+#include <sys/types.h>
+#include <sys/time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "merc.h"
+#include "strings.h"
+#include "random.h"
+#include "db.h"
+#include "act.h"
+#include "interp.h"
+#include "magic.h"
+#include "tables.h"
+#include "special.h"
+
+/* the function table */
+const struct spec_type  spec_table[] = {
+    {"spec_breath_any", spec_breath_any},
+    {"spec_breath_acid", spec_breath_acid},
+    {"spec_breath_fire", spec_breath_fire},
+    {"spec_breath_frost", spec_breath_frost},
+    {"spec_breath_gas", spec_breath_gas},
+    {"spec_breath_lightning", spec_breath_lightning},
+    {"spec_cast_adept", spec_cast_adept},
+    {"spec_cast_cleric", spec_cast_cleric},
+    {"spec_cast_judge", spec_cast_judge},
+    {"spec_cast_mage", spec_cast_mage},
+    {"spec_cast_undead", spec_cast_undead},
+    {"spec_executioner", spec_executioner},
+    {"spec_fido", spec_fido},
+    {"spec_guard", spec_guard},
+    {"spec_janitor", spec_janitor},
+    {"spec_mayor", spec_mayor},
+    {"spec_poison", spec_poison},
+    {"spec_thief", spec_thief},
+    {"spec_nasty", spec_nasty},
+    {"spec_troll_member", spec_troll_member},
+    {"spec_ogre_member", spec_ogre_member},
+    {"spec_patrolman", spec_patrolman},
+    {NULL, NULL}
+};
+
+/*
+ * Given a name, return the appropriate spec fun.
+ */
+SPEC_FUN               *spec_lookup( const char *name )
+{
+    int                     i = 0;
+
+    for ( i = 0; spec_table[i].name != NULL; i++ )
+    {
+        if ( LOWER( name[0] ) == LOWER( spec_table[i].name[0] )
+             && !str_prefix( name, spec_table[i].name ) )
+            return spec_table[i].function;
+    }
+
+    return NULL;
+}
+
+const char             *spec_name( SPEC_FUN *function )
+{
+    int                     i = 0;
+
+    for ( i = 0; spec_table[i].function != NULL; i++ )
+    {
+        if ( function == spec_table[i].function )
+            return spec_table[i].name;
+    }
+
+    return NULL;
+}
+
+/*
+ * Core procedure for dragons.
+ */
+bool dragon( CHAR_DATA *ch, const char *spell_name )
+{
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+    int                     sn = -1;
+
+    if ( ch->position != POS_FIGHTING )
+        return false;
+
+    for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+    {
+        v_next = victim->next_in_room;
+        if ( victim->fighting == ch && number_bits( 3 ) == 0 )
+            break;
+    }
+
+    if ( victim == NULL )
+        return false;
+
+    if ( ( sn = skill_lookup( spell_name ) ) < 0 )
+        return false;
+    ( *skill_table[sn].spell_fun ) ( sn, ch->level, ch, victim, TARGET_CHAR );
+    return true;
+}
+
+/*
+ * Special procedures for mobiles.
+ */
+bool spec_breath_any( CHAR_DATA *ch )
+{
+    if ( ch->position != POS_FIGHTING )
+        return false;
+
+    switch ( number_bits( 3 ) )
+    {
+        case 0:
+            return spec_breath_fire( ch );
+        case 1:
+        case 2:
+            return spec_breath_lightning( ch );
+        case 3:
+            return spec_breath_gas( ch );
+        case 4:
+            return spec_breath_acid( ch );
+        case 5:
+        case 6:
+        case 7:
+            return spec_breath_frost( ch );
+    }
+
+    return false;
+}
+
+bool spec_breath_acid( CHAR_DATA *ch )
+{
+    return dragon( ch, "acid breath" );
+}
+
+bool spec_breath_fire( CHAR_DATA *ch )
+{
+    return dragon( ch, "fire breath" );
+}
+
+bool spec_breath_frost( CHAR_DATA *ch )
+{
+    return dragon( ch, "frost breath" );
+}
+
+bool spec_breath_gas( CHAR_DATA *ch )
+{
+    int                     sn = -1;
+
+    if ( ch->position != POS_FIGHTING )
+        return false;
+
+    if ( ( sn = skill_lookup( "gas breath" ) ) < 0 )
+        return false;
+    ( *skill_table[sn].spell_fun ) ( sn, ch->level, ch, NULL, TARGET_CHAR );
+    return true;
+}
+
+bool spec_breath_lightning( CHAR_DATA *ch )
+{
+    return dragon( ch, "lightning breath" );
+}
+
+bool spec_cast_adept( CHAR_DATA *ch )
+{
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+
+    if ( !IS_AWAKE( ch ) )
+        return false;
+
+    for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+    {
+        v_next = victim->next_in_room;
+        if ( victim != ch && can_see( ch, victim ) && number_bits( 1 ) == 0
+             && !IS_NPC( victim ) && victim->level < 11 )
+            break;
+    }
+
+    if ( victim == NULL )
+        return false;
+
+    switch ( number_bits( 4 ) )
+    {
+        case 0:
+            act( "$n utters the word 'abrazak'.", ch, NULL, NULL, TO_ROOM );
+            spell_armor( skill_lookup( "armor" ), ch->level, ch, victim, TARGET_CHAR );
+            return true;
+
+        case 1:
+            act( "$n utters the word 'fido'.", ch, NULL, NULL, TO_ROOM );
+            spell_bless( skill_lookup( "bless" ), ch->level, ch, victim, TARGET_CHAR );
+            return true;
+
+        case 2:
+            act( "$n utters the words 'judicandus noselacri'.", ch, NULL, NULL, TO_ROOM );
+            spell_cure_blindness( skill_lookup( "cure blindness" ),
+                                  ch->level, ch, victim, TARGET_CHAR );
+            return true;
+
+        case 3:
+            act( "$n utters the words 'judicandus dies'.", ch, NULL, NULL, TO_ROOM );
+            spell_cure_light( skill_lookup( "cure light" ),
+                              ch->level, ch, victim, TARGET_CHAR );
+            return true;
+
+        case 4:
+            act( "$n utters the words 'judicandus sausabru'.", ch, NULL, NULL, TO_ROOM );
+            spell_cure_poison( skill_lookup( "cure poison" ),
+                               ch->level, ch, victim, TARGET_CHAR );
+            return true;
+
+        case 5:
+            act( "$n utters the word 'candusima'.", ch, NULL, NULL, TO_ROOM );
+            spell_refresh( skill_lookup( "refresh" ), ch->level, ch, victim,
+                           TARGET_CHAR );
+            return true;
+
+        case 6:
+            act( "$n utters the words 'judicandus eugzagz'.", ch, NULL, NULL, TO_ROOM );
+            spell_cure_disease( skill_lookup( "cure disease" ),
+                                ch->level, ch, victim, TARGET_CHAR );
+    }
+
+    return false;
+}
+
+bool spec_cast_cleric( CHAR_DATA *ch )
+{
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+    const char             *spell = NULL;
+    int                     sn = -1;
+
+    if ( ch->position != POS_FIGHTING )
+        return false;
+
+    for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+    {
+        v_next = victim->next_in_room;
+        if ( victim->fighting == ch && number_bits( 2 ) == 0 )
+            break;
+    }
+
+    if ( victim == NULL )
+        return false;
+
+    for ( ;; )
+    {
+        int                     min_level;
+
+        switch ( number_bits( 4 ) )
+        {
+            case 0:
+                min_level = 0;
+                spell = "blindness";
+                break;
+            case 1:
+                min_level = 3;
+                spell = "cause serious";
+                break;
+            case 2:
+                min_level = 7;
+                spell = "earthquake";
+                break;
+            case 3:
+                min_level = 9;
+                spell = "cause critical";
+                break;
+            case 4:
+                min_level = 10;
+                spell = "dispel evil";
+                break;
+            case 5:
+                min_level = 12;
+                spell = "curse";
+                break;
+            case 6:
+                min_level = 12;
+                spell = "change sex";
+                break;
+            case 7:
+                min_level = 13;
+                spell = "flamestrike";
+                break;
+            case 8:
+            case 9:
+            case 10:
+                min_level = 15;
+                spell = "harm";
+                break;
+            case 11:
+                min_level = 15;
+                spell = "plague";
+                break;
+            default:
+                min_level = 16;
+                spell = "dispel magic";
+                break;
+        }
+
+        if ( ch->level >= min_level )
+            break;
+    }
+
+    if ( ( sn = skill_lookup( spell ) ) < 0 )
+        return false;
+    ( *skill_table[sn].spell_fun ) ( sn, ch->level, ch, victim, TARGET_CHAR );
+    return true;
+}
+
+bool spec_cast_judge( CHAR_DATA *ch )
+{
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+    const char             *spell = NULL;
+    int                     sn = -1;
+
+    if ( ch->position != POS_FIGHTING )
+        return false;
+
+    for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+    {
+        v_next = victim->next_in_room;
+        if ( victim->fighting == ch && number_bits( 2 ) == 0 )
+            break;
+    }
+
+    if ( victim == NULL )
+        return false;
+
+    spell = "high explosive";
+    if ( ( sn = skill_lookup( spell ) ) < 0 )
+        return false;
+    ( *skill_table[sn].spell_fun ) ( sn, ch->level, ch, victim, TARGET_CHAR );
+    return true;
+}
+
+bool spec_cast_mage( CHAR_DATA *ch )
+{
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+    const char             *spell = NULL;
+    int                     sn = -1;
+
+    if ( ch->position != POS_FIGHTING )
+        return false;
+
+    for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+    {
+        v_next = victim->next_in_room;
+        if ( victim->fighting == ch && number_bits( 2 ) == 0 )
+            break;
+    }
+
+    if ( victim == NULL )
+        return false;
+
+    for ( ;; )
+    {
+        int                     min_level = 0;
+
+        switch ( number_bits( 4 ) )
+        {
+            case 0:
+                min_level = 0;
+                spell = "blindness";
+                break;
+            case 1:
+                min_level = 3;
+                spell = "chill touch";
+                break;
+            case 2:
+                min_level = 7;
+                spell = "weaken";
+                break;
+            case 3:
+                min_level = 8;
+                spell = "teleport";
+                break;
+            case 4:
+                min_level = 11;
+                spell = "colour spray";
+                break;
+            case 5:
+                min_level = 12;
+                spell = "change sex";
+                break;
+            case 6:
+                min_level = 13;
+                spell = "energy drain";
+                break;
+            case 7:
+            case 8:
+            case 9:
+                min_level = 15;
+                spell = "fireball";
+                break;
+            case 10:
+                min_level = 20;
+                spell = "plague";
+                break;
+            default:
+                min_level = 20;
+                spell = "acid blast";
+                break;
+        }
+
+        if ( ch->level >= min_level )
+            break;
+    }
+
+    if ( ( sn = skill_lookup( spell ) ) < 0 )
+        return false;
+    ( *skill_table[sn].spell_fun ) ( sn, ch->level, ch, victim, TARGET_CHAR );
+    return true;
+}
+
+bool spec_cast_undead( CHAR_DATA *ch )
+{
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+    const char             *spell = NULL;
+    int                     sn = -1;
+
+    if ( ch->position != POS_FIGHTING )
+        return false;
+
+    for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+    {
+        v_next = victim->next_in_room;
+        if ( victim->fighting == ch && number_bits( 2 ) == 0 )
+            break;
+    }
+
+    if ( victim == NULL )
+        return false;
+
+    for ( ;; )
+    {
+        int                     min_level = 0;
+
+        switch ( number_bits( 4 ) )
+        {
+            case 0:
+                min_level = 0;
+                spell = "curse";
+                break;
+            case 1:
+                min_level = 3;
+                spell = "weaken";
+                break;
+            case 2:
+                min_level = 6;
+                spell = "chill touch";
+                break;
+            case 3:
+                min_level = 9;
+                spell = "blindness";
+                break;
+            case 4:
+                min_level = 12;
+                spell = "poison";
+                break;
+            case 5:
+                min_level = 15;
+                spell = "energy drain";
+                break;
+            case 6:
+                min_level = 18;
+                spell = "harm";
+                break;
+            case 7:
+                min_level = 21;
+                spell = "teleport";
+                break;
+            case 8:
+                min_level = 20;
+                spell = "plague";
+                break;
+            default:
+                min_level = 18;
+                spell = "harm";
+                break;
+        }
+
+        if ( ch->level >= min_level )
+            break;
+    }
+
+    if ( ( sn = skill_lookup( spell ) ) < 0 )
+        return false;
+    ( *skill_table[sn].spell_fun ) ( sn, ch->level, ch, victim, TARGET_CHAR );
+    return true;
+}
+
+bool spec_executioner( CHAR_DATA *ch )
+{
+    char                    buf[MAX_STRING_LENGTH] = "\0\0\0\0\0\0\0";
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+    const char             *crime = NULL;
+
+    if ( !IS_AWAKE( ch ) || ch->fighting != NULL )
+        return false;
+
+    crime = "";
+    for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+    {
+        v_next = victim->next_in_room;
+
+        if ( !IS_NPC( victim ) && IS_SET( victim->act, PLR_KILLER )
+             && can_see( ch, victim ) && !IS_IMMORTAL( victim ) )
+        {
+            crime = "KILLER";
+            break;
+        }
+
+        if ( !IS_NPC( victim ) && IS_SET( victim->act, PLR_THIEF )
+             && can_see( ch, victim ) && !IS_IMMORTAL( victim ) )
+        {
+            crime = "THIEF";
+            break;
+        }
+    }
+
+    if ( victim == NULL )
+        return false;
+
+    sprintf( buf, "%s is a %s!  PROTECT THE INNOCENT!  MORE BLOOOOD!!!",
+             victim->name, crime );
+    REMOVE_BIT( ch->comm, COMM_NOSHOUT );
+    do_function( ch, &do_yell, buf );
+    multi_hit( ch, victim, TYPE_UNDEFINED );
+    return true;
+}
+
+bool spec_fido( CHAR_DATA *ch )
+{
+    OBJ_DATA               *corpse = NULL;
+    OBJ_DATA               *c_next = NULL;
+    OBJ_DATA               *obj = NULL;
+    OBJ_DATA               *obj_next = NULL;
+
+    if ( !IS_AWAKE( ch ) )
+        return false;
+
+    for ( corpse = ch->in_room->contents; corpse != NULL; corpse = c_next )
+    {
+        c_next = corpse->next_content;
+        if ( corpse->item_type != ITEM_CORPSE_NPC )
+            continue;
+
+        act( "$n savagely devours a corpse.", ch, NULL, NULL, TO_ROOM );
+        for ( obj = corpse->contains; obj; obj = obj_next )
+        {
+            obj_next = obj->next_content;
+            obj_from_obj( obj );
+            obj_to_room( obj, ch->in_room );
+        }
+        extract_obj( corpse );
+        return true;
+    }
+
+    return false;
+}
+
+bool spec_guard( CHAR_DATA *ch )
+{
+    char                    buf[MAX_STRING_LENGTH] = "\0\0\0\0\0\0\0";
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+    CHAR_DATA              *ech = NULL;
+    const char             *crime = NULL;
+    int                     max_evil = 0;
+
+    if ( !IS_AWAKE( ch ) || ch->fighting != NULL )
+        return false;
+
+    max_evil = 300;
+    ech = NULL;
+    crime = "";
+
+    for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+    {
+        v_next = victim->next_in_room;
+
+        if ( !IS_NPC( victim ) && IS_SET( victim->act, PLR_KILLER )
+             && can_see( ch, victim ) && !IS_IMMORTAL( victim ) )
+        {
+            crime = "KILLER";
+            break;
+        }
+
+        if ( !IS_NPC( victim ) && IS_SET( victim->act, PLR_THIEF )
+             && can_see( ch, victim ) && !IS_IMMORTAL( victim ) )
+        {
+            crime = "THIEF";
+            break;
+        }
+
+        if ( victim->fighting != NULL
+             && victim->fighting != ch
+             && victim->alignment < max_evil && !IS_IMMORTAL( victim ) )
+        {
+            max_evil = victim->alignment;
+            ech = victim;
+        }
+    }
+
+    if ( victim != NULL )
+    {
+        sprintf( buf, "%s is a %s!  PROTECT THE INNOCENT!!  BANZAI!!",
+                 victim->name, crime );
+        REMOVE_BIT( ch->comm, COMM_NOSHOUT );
+        do_function( ch, &do_yell, buf );
+        multi_hit( ch, victim, TYPE_UNDEFINED );
+        return true;
+    }
+
+    if ( ech != NULL )
+    {
+        act( "$n screams 'PROTECT THE INNOCENT!!  BANZAI!!", ch, NULL, NULL, TO_ROOM );
+        multi_hit( ch, ech, TYPE_UNDEFINED );
+        return true;
+    }
+
+    return false;
+}
+
+bool spec_janitor( CHAR_DATA *ch )
+{
+    OBJ_DATA               *trash = NULL;
+    OBJ_DATA               *trash_next = NULL;
+
+    if ( !IS_AWAKE( ch ) )
+        return false;
+
+    for ( trash = ch->in_room->contents; trash != NULL; trash = trash_next )
+    {
+        trash_next = trash->next_content;
+        if ( !IS_SET( trash->wear_flags, ITEM_TAKE ) || !can_loot( ch, trash ) )
+            continue;
+        if ( trash->item_type == ITEM_DRINK_CON
+             || trash->item_type == ITEM_TRASH || trash->cost < 10 )
+        {
+            act( "$n picks up some trash.", ch, NULL, NULL, TO_ROOM );
+            obj_from_room( trash );
+            obj_to_char( trash, ch );
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool spec_mayor( CHAR_DATA *ch )
+{
+    static const char       open_path[] =
+        "W3a3003b33000c111d0d111Oe333333Oe22c222112212111a1S.";
+
+    static const char       close_path[] =
+        "W3a3003b33000c111d0d111CE333333CE22c222112212111a1S.";
+
+    static const char      *path = NULL;
+    static int              pos = 0;
+    static bool             move = false;
+
+    if ( !move )
+    {
+        if ( time_info.hour == 6 )
+        {
+            path = open_path;
+            move = true;
+            pos = 0;
+        }
+
+        if ( time_info.hour == 20 )
+        {
+            path = close_path;
+            move = true;
+            pos = 0;
+        }
+    }
+
+    if ( ch->fighting != NULL )
+        return spec_cast_mage( ch );
+    if ( !move || ch->position < POS_SLEEPING )
+        return false;
+
+    switch ( path[pos] )
+    {
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+            move_char( ch, path[pos] - '0', false );
+            break;
+
+        case 'W':
+            ch->position = POS_STANDING;
+            act( "$n awakens and groans loudly.", ch, NULL, NULL, TO_ROOM );
+            break;
+
+        case 'S':
+            ch->position = POS_SLEEPING;
+            act( "$n lies down and falls asleep.", ch, NULL, NULL, TO_ROOM );
+            break;
+
+        case 'a':
+            act( "$n says 'Hello Honey!'", ch, NULL, NULL, TO_ROOM );
+            break;
+
+        case 'b':
+            act( "$n says 'What a view!  I must do something about that dump!'",
+                 ch, NULL, NULL, TO_ROOM );
+            break;
+
+        case 'c':
+            act( "$n says 'Vandals!  Youngsters have no respect for anything!'",
+                 ch, NULL, NULL, TO_ROOM );
+            break;
+
+        case 'd':
+            act( "$n says 'Good day, citizens!'", ch, NULL, NULL, TO_ROOM );
+            break;
+
+        case 'e':
+            act( "$n says 'I hereby declare the city of Midgaard open!'",
+                 ch, NULL, NULL, TO_ROOM );
+            break;
+
+        case 'E':
+            act( "$n says 'I hereby declare the city of Midgaard closed!'",
+                 ch, NULL, NULL, TO_ROOM );
+            break;
+
+        case 'O':
+/*        do_function(ch, &do_unlock, "gate" ); */
+            do_function( ch, &do_open, "gate" );
+            break;
+
+        case 'C':
+            do_function( ch, &do_close, "gate" );
+/*        do_function(ch, &do_lock, "gate" ); */
+            break;
+
+        case '.':
+            move = false;
+            break;
+    }
+
+    pos++;
+    return false;
+}
+
+bool spec_poison( CHAR_DATA *ch )
+{
+    CHAR_DATA              *victim = NULL;
+
+    if ( ch->position != POS_FIGHTING
+         || ( victim = ch->fighting ) == NULL || number_percent(  ) > 2 * ch->level )
+        return false;
+
+    act( "You bite $N!", ch, NULL, victim, TO_CHAR );
+    act( "$n bites $N!", ch, NULL, victim, TO_NOTVICT );
+    act( "$n bites you!", ch, NULL, victim, TO_VICT );
+    spell_poison( skill_lookup( "poison" ), ch->level, ch, victim, TARGET_CHAR );
+    return true;
+}
+
+bool spec_thief( CHAR_DATA *ch )
+{
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+    int                     gold = 0;
+    int                     silver = 0;
+
+    if ( ch->position != POS_STANDING )
+        return false;
+
+    for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+    {
+        v_next = victim->next_in_room;
+
+        if ( IS_NPC( victim )
+             || victim->level >= LEVEL_IMMORTAL
+             || number_bits( 5 ) != 0 || !can_see( ch, victim ) )
+            continue;
+
+        if ( IS_AWAKE( victim ) && number_range( 0, ch->level ) == 0 )
+        {
+            act( "You discover $n's hands in your wallet!", ch, NULL, victim, TO_VICT );
+            act( "$N discovers $n's hands in $S wallet!", ch, NULL, victim, TO_NOTVICT );
+            return true;
+        }
+        else
+        {
+            gold = victim->gold * UMIN( number_range( 1, 20 ), ch->level / 2 ) / 100;
+            gold = UMIN( gold, ch->level * ch->level * 10 );
+            ch->gold += gold;
+            victim->gold -= gold;
+            silver = victim->silver * UMIN( number_range( 1, 20 ), ch->level / 2 ) / 100;
+            silver = UMIN( silver, ch->level * ch->level * 25 );
+            ch->silver += silver;
+            victim->silver -= silver;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool spec_nasty( CHAR_DATA *ch )
+{
+    CHAR_DATA              *victim = NULL;
+    CHAR_DATA              *v_next = NULL;
+    int                     gold = 0;
+
+    if ( !IS_AWAKE( ch ) )
+    {
+        return false;
+    }
+
+    if ( ch->position != POS_FIGHTING )
+    {
+        for ( victim = ch->in_room->people; victim != NULL; victim = v_next )
+        {
+            v_next = victim->next_in_room;
+            if ( !IS_NPC( victim )
+                 && ( victim->level > ch->level ) && ( victim->level < ch->level + 10 ) )
+            {
+                do_function( ch, &do_backstab, victim->name );
+                if ( ch->position != POS_FIGHTING )
+                {
+                    do_function( ch, &do_murder, victim->name );
+                }
+
+                /*
+                 * should steal some coins right away? :) 
+                 */
+                return true;
+            }
+        }
+        return false;                                  /* No one to attack */
+    }
+
+    /*
+     * okay, we must be fighting.... steal some coins and flee 
+     */
+    if ( ( victim = ch->fighting ) == NULL )
+        return false;                                  /* let's be paranoid.... */
+
+    switch ( number_bits( 2 ) )
+    {
+        case 0:
+            act( "$n rips apart your coin purse, spilling your gold!",
+                 ch, NULL, victim, TO_VICT );
+            act( "You slash apart $N's coin purse and gather his gold.",
+                 ch, NULL, victim, TO_CHAR );
+            act( "$N's coin purse is ripped apart!", ch, NULL, victim, TO_NOTVICT );
+            gold = victim->gold / 10;                  /* steal 10% of his gold */
+            victim->gold -= gold;
+            ch->gold += gold;
+            return true;
+
+        case 1:
+            do_function( ch, &do_flee, "" );
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+bool spec_troll_member( CHAR_DATA *ch )
+{
+    CHAR_DATA              *vch = NULL;
+    CHAR_DATA              *victim = NULL;
+    int                     count = 0;
+    const char             *message = NULL;
+
+    if ( !IS_AWAKE( ch ) || IS_AFFECTED( ch, AFF_CALM ) || ch->in_room == NULL
+         || IS_AFFECTED( ch, AFF_CHARM ) || ch->fighting != NULL )
+        return false;
+
+    /*
+     * find an ogre to beat up 
+     */
+    for ( vch = ch->in_room->people; vch != NULL; vch = vch->next_in_room )
+    {
+        if ( !IS_NPC( vch ) || ch == vch )
+            continue;
+
+        if ( vch->pIndexData->vnum == MOB_VNUM_PATROLMAN )
+            return false;
+
+        if ( vch->pIndexData->group == GROUP_VNUM_OGRES
+             && ch->level > vch->level - 2 && !is_safe( ch, vch ) )
+        {
+            if ( number_range( 0, count ) == 0 )
+                victim = vch;
+
+            count++;
+        }
+    }
+
+    if ( victim == NULL )
+        return false;
+
+    /*
+     * say something, then raise hell 
+     */
+    switch ( number_range( 0, 6 ) )
+    {
+        default:
+            message = NULL;
+            break;
+        case 0:
+            message = "$n yells 'I've been looking for you, punk!'";
+            break;
+        case 1:
+            message = "With a scream of rage, $n attacks $N.";
+            break;
+        case 2:
+            message = "$n says 'What's slimy Ogre trash like you doing around here?'";
+            break;
+        case 3:
+            message = "$n cracks his knuckles and says 'Do ya feel lucky?'";
+            break;
+        case 4:
+            message = "$n says 'There's no cops to save you this time!'";
+            break;
+        case 5:
+            message = "$n says 'Time to join your brother, spud.'";
+            break;
+        case 6:
+            message = "$n says 'Let's rock.'";
+            break;
+    }
+
+    if ( message != NULL )
+        act( message, ch, NULL, victim, TO_ALL );
+    multi_hit( ch, victim, TYPE_UNDEFINED );
+    return true;
+}
+
+bool spec_ogre_member( CHAR_DATA *ch )
+{
+    CHAR_DATA              *vch = NULL;
+    CHAR_DATA              *victim = NULL;
+    int                     count = 0;
+    const char             *message = NULL;
+
+    if ( !IS_AWAKE( ch ) || IS_AFFECTED( ch, AFF_CALM ) || ch->in_room == NULL
+         || IS_AFFECTED( ch, AFF_CHARM ) || ch->fighting != NULL )
+        return false;
+
+    /*
+     * find an troll to beat up 
+     */
+    for ( vch = ch->in_room->people; vch != NULL; vch = vch->next_in_room )
+    {
+        if ( !IS_NPC( vch ) || ch == vch )
+            continue;
+
+        if ( vch->pIndexData->vnum == MOB_VNUM_PATROLMAN )
+            return false;
+
+        if ( vch->pIndexData->group == GROUP_VNUM_TROLLS
+             && ch->level > vch->level - 2 && !is_safe( ch, vch ) )
+        {
+            if ( number_range( 0, count ) == 0 )
+                victim = vch;
+
+            count++;
+        }
+    }
+
+    if ( victim == NULL )
+        return false;
+
+    /*
+     * say something, then raise hell 
+     */
+    switch ( number_range( 0, 6 ) )
+    {
+        default:
+            message = NULL;
+            break;
+        case 0:
+            message = "$n yells 'I've been looking for you, punk!'";
+            break;
+        case 1:
+            message = "With a scream of rage, $n attacks $N.'";
+            break;
+        case 2:
+            message = "$n says 'What's Troll filth like you doing around here?'";
+            break;
+        case 3:
+            message = "$n cracks his knuckles and says 'Do ya feel lucky?'";
+            break;
+        case 4:
+            message = "$n says 'There's no cops to save you this time!'";
+            break;
+        case 5:
+            message = "$n says 'Time to join your brother, spud.'";
+            break;
+        case 6:
+            message = "$n says 'Let's rock.'";
+            break;
+    }
+
+    if ( message != NULL )
+        act( message, ch, NULL, victim, TO_ALL );
+    multi_hit( ch, victim, TYPE_UNDEFINED );
+    return true;
+}
+
+bool spec_patrolman( CHAR_DATA *ch )
+{
+    CHAR_DATA              *vch = NULL;
+    CHAR_DATA              *victim = NULL;
+    OBJ_DATA               *obj = NULL;
+    const char             *message = NULL;
+    int                     count = 0;
+
+    if ( !IS_AWAKE( ch ) || IS_AFFECTED( ch, AFF_CALM ) || ch->in_room == NULL
+         || IS_AFFECTED( ch, AFF_CHARM ) || ch->fighting != NULL )
+        return false;
+
+    /*
+     * look for a fight in the room 
+     */
+    for ( vch = ch->in_room->people; vch != NULL; vch = vch->next_in_room )
+    {
+        if ( vch == ch )
+            continue;
+
+        if ( vch->fighting != NULL )                   /* break it up! */
+        {
+            if ( number_range( 0, count ) == 0 )
+                victim = ( vch->level > vch->fighting->level ) ? vch : vch->fighting;
+            count++;
+        }
+    }
+
+    if ( victim == NULL || ( IS_NPC( victim ) && victim->spec_fun == ch->spec_fun ) )
+        return false;
+
+    if ( ( ( obj = get_eq_char( ch, WEAR_NECK_1 ) ) != NULL
+           && obj->pIndexData->vnum == OBJ_VNUM_WHISTLE )
+         || ( ( obj = get_eq_char( ch, WEAR_NECK_2 ) ) != NULL
+              && obj->pIndexData->vnum == OBJ_VNUM_WHISTLE ) )
+    {
+        act( "You blow down hard on $p.", ch, obj, NULL, TO_CHAR );
+        act( "$n blows on $p, ***WHEEEEEEEEEEEET***", ch, obj, NULL, TO_ROOM );
+
+        for ( vch = char_list; vch != NULL; vch = vch->next )
+        {
+            if ( vch->in_room == NULL )
+                continue;
+
+            if ( vch->in_room != ch->in_room && vch->in_room->area == ch->in_room->area )
+                ch_printf( vch, "You hear a shrill whistling sound.\r\n" );
+        }
+    }
+
+    switch ( number_range( 0, 6 ) )
+    {
+        default:
+            message = NULL;
+            break;
+        case 0:
+            message = "$n yells 'All roit! All roit! break it up!'";
+            break;
+        case 1:
+            message = "$n says 'Society's to blame, but what's a bloke to do?'";
+            break;
+        case 2:
+            message = "$n mumbles 'bloody kids will be the death of us all.'";
+            break;
+        case 3:
+            message = "$n shouts 'Stop that! Stop that!' and attacks.";
+            break;
+        case 4:
+            message = "$n pulls out his billy and goes to work.";
+            break;
+        case 5:
+            message = "$n sighs in resignation and proceeds to break up the fight.";
+            break;
+        case 6:
+            message = "$n says 'Settle down, you hooligans!'";
+            break;
+    }
+
+    if ( message != NULL )
+        act( message, ch, NULL, NULL, TO_ALL );
+
+    multi_hit( ch, victim, TYPE_UNDEFINED );
+
+    return true;
+}
+
+void do_heal( CHAR_DATA *ch, const char *argument )
+{
+    CHAR_DATA              *mob = NULL;
+    char                    arg[MAX_INPUT_LENGTH] = "\0\0\0\0\0\0\0";
+    int                     cost = 0;
+    int                     sn = -1;
+    SPELL_FUN              *spell = NULL;
+    const char             *words = NULL;
+
+    /*
+     * check for healer 
+     */
+    for ( mob = ch->in_room->people; mob; mob = mob->next_in_room )
+    {
+        if ( IS_NPC( mob ) && IS_SET( mob->act, ACT_IS_HEALER ) )
+            break;
+    }
+
+    if ( mob == NULL )
+    {
+        ch_printf( ch, "You can't do that here.\r\n" );
+        return;
+    }
+
+    one_argument( argument, arg );
+
+    if ( arg[0] == '\0' )
+    {
+        /*
+         * display price list 
+         */
+        act( "$N says 'I offer the following spells:'", ch, NULL, mob, TO_CHAR );
+        ch_printf( ch, "  light: cure light wounds      10 gold\r\n" );
+        ch_printf( ch, "  serious: cure serious wounds  15 gold\r\n" );
+        ch_printf( ch, "  critic: cure critical wounds  25 gold\r\n" );
+        ch_printf( ch, "  heal: healing spell           50 gold\r\n" );
+        ch_printf( ch, "  blind: cure blindness         20 gold\r\n" );
+        ch_printf( ch, "  disease: cure disease         15 gold\r\n" );
+        ch_printf( ch, "  poison:  cure poison          25 gold\r\n" );
+        ch_printf( ch, "  uncurse: remove curse         50 gold\r\n" );
+        ch_printf( ch, "  refresh: restore movement      5 gold\r\n" );
+        ch_printf( ch, "  mana:  restore mana           10 gold\r\n" );
+        ch_printf( ch, " Type heal <type> to be healed.\r\n" );
+        return;
+    }
+
+    if ( !str_prefix( arg, "light" ) )
+    {
+        spell = spell_cure_light;
+        sn = skill_lookup( "cure light" );
+        words = "judicandus dies";
+        cost = 1000;
+    }
+
+    else if ( !str_prefix( arg, "serious" ) )
+    {
+        spell = spell_cure_serious;
+        sn = skill_lookup( "cure serious" );
+        words = "judicandus gzfuajg";
+        cost = 1600;
+    }
+
+    else if ( !str_prefix( arg, "critical" ) )
+    {
+        spell = spell_cure_critical;
+        sn = skill_lookup( "cure critical" );
+        words = "judicandus qfuhuqar";
+        cost = 2500;
+    }
+
+    else if ( !str_prefix( arg, "heal" ) )
+    {
+        spell = spell_heal;
+        sn = skill_lookup( "heal" );
+        words = "pzar";
+        cost = 5000;
+    }
+
+    else if ( !str_prefix( arg, "blindness" ) )
+    {
+        spell = spell_cure_blindness;
+        sn = skill_lookup( "cure blindness" );
+        words = "judicandus noselacri";
+        cost = 2000;
+    }
+
+    else if ( !str_prefix( arg, "disease" ) )
+    {
+        spell = spell_cure_disease;
+        sn = skill_lookup( "cure disease" );
+        words = "judicandus eugzagz";
+        cost = 1500;
+    }
+
+    else if ( !str_prefix( arg, "poison" ) )
+    {
+        spell = spell_cure_poison;
+        sn = skill_lookup( "cure poison" );
+        words = "judicandus sausabru";
+        cost = 2500;
+    }
+
+    else if ( !str_prefix( arg, "uncurse" ) || !str_prefix( arg, "curse" ) )
+    {
+        spell = spell_remove_curse;
+        sn = skill_lookup( "remove curse" );
+        words = "candussido judifgz";
+        cost = 5000;
+    }
+
+    else if ( !str_prefix( arg, "mana" ) || !str_prefix( arg, "energize" ) )
+    {
+        spell = NULL;
+        sn = -1;
+        words = "energizer";
+        cost = 1000;
+    }
+
+    else if ( !str_prefix( arg, "refresh" ) || !str_prefix( arg, "moves" ) )
+    {
+        spell = spell_refresh;
+        sn = skill_lookup( "refresh" );
+        words = "candusima";
+        cost = 500;
+    }
+
+    else
+    {
+        act( "$N says 'Type 'heal' for a list of spells.'", ch, NULL, mob, TO_CHAR );
+        return;
+    }
+
+    if ( cost > ( ch->gold * 100 + ch->silver ) )
+    {
+        act( "$N says 'You do not have enough gold for my services.'",
+             ch, NULL, mob, TO_CHAR );
+        return;
+    }
+
+    WAIT_STATE( ch, PULSE_VIOLENCE );
+
+    deduct_cost( ch, cost );
+    mob->gold += cost / 100;
+    mob->silver += cost % 100;
+    act( "$n utters the words '$T'.", mob, NULL, words, TO_ROOM );
+
+    if ( spell == NULL )                               /* restore mana trap...kinda
+                                                        * hackish */
+    {
+        ch->mana += dice( 2, 8 ) + mob->level / 3;
+        ch->mana = UMIN( ch->mana, ch->max_mana );
+        ch_printf( ch, "A warm glow passes through you.\r\n" );
+        return;
+    }
+
+    if ( sn == -1 )
+        return;
+
+    spell( sn, mob->level, mob, ch, TARGET_CHAR );
+}

@@ -1,0 +1,125 @@
+081021	Quixadhal
+  1321	This is a shopping list of things we need to address.  Some of them
+	are just ideas I have as I go along, some are bugs I find but don't
+	have time to fix right then, some are hard-coded constants that
+	really should become configurable.
+
+	I noticed that do_ofind() and do_mfind() both do really nasty
+	loops over empty vnum spaces to look for things.  That should
+	really be redone.
+
+	In "The Future(TM)", I'd like to move away from linked lists and
+	actually store all these things in trees so it's easier to
+	maintain and faster to access.
+
+	Here's the idea... instead of storing things in an array of linked
+	lists, how about just storing them in a balanced binary tree.
+	Walking the tree is easy, and at each node we can not only store
+	the definition for the prototype, but we can keep a linked list
+	of all instances.  Thus, the reset system also benefits.
+
+  1325	obj_check(), uses IS_TRUSTED() to see what various level immortals
+	are allowed to "load".  It has hard-coded constants for the level
+	and cost of the items.  Those should really be something that
+	can be configured at boot time.
+
+	Personally, I dislike the whole level/trust entwining, and I'd
+	rather redo it all as a more clear and distinct permission system,
+	but that's probably something best poked at down the road a ways.
+
+  1413	The PC and NPC races really should be merged, with a flag to say
+	if a particular race is available for character creation.
+080125	Quixadhal
+  0209	I noticed that stuff in const.c is used from objects via their
+	weirdo flag values.... The code attempts to do one sided bounds
+	checking (for things < 0), but doesn't check for running off the
+	other ends of the array.
+
+	All this stuff will need to be loaded from disk files to support
+	OLC anyways, but keep it in mind... we should check both sides
+	or use a function to get the info so it can do the checks.
+
+  0408	Weep for the children!
+
+	   1.        /*
+	   2.         * hack to make new thalos pets work
+	   3.         */
+	   4.         if ( ch->in_room->vnum == 9621 )
+	   5.             pRoomIndexNext = get_room_index( 9706 );
+	   6.         else   
+	   7.             pRoomIndexNext = get_room_index( ch->in_room->vnum + 1 );
+	   8.         if ( pRoomIndexNext == NULL )
+	   9.         {         
+	  10.             log_error( "Bad pet shop at vnum %d", ch->in_room->vnum );
+	  11.             send_to_char( "Sorry, you can't buy that here.\n\r", ch );
+	  12.             return;
+	  13.         }
+
+	That kind of hard-coded nonsense has to go.
+
+  1736	I think the zone reset logic needs a bit of love.  My own game
+	lets you specify reset times per zone AND say if you care that
+	there are players present or not.
+
+081031	Quixadhal
+  1627	Hunt down all the places we have N * MAX_STRING_LENGTH, since that
+	means MAX_STRING_LENGTH isn't big enough (it isn't really a MAX).
+
+081105	Quixadhal
+  0930	In the do_outfit() function, the hard-coded level restriction should
+	at least become a define, at best become configurable at runtime.
+
+  1027	We need to move the hard-coded banned names into a file, rather than
+	being in check_parse_name().
+
+081109	Quixadhal
+  1641	Argh!  Begone foul daemons!!!!!!
+
+        /*
+         * hack to make new thalos pets work 
+         */
+        if ( ch->in_room->vnum == 9621 )
+            pRoomIndexNext = get_room_index( 9706 );
+        else
+            pRoomIndexNext = get_room_index( ch->in_room->vnum + 1 );
+
+	How about, instead, we (a) rearrange the rooms in New Thalos to work
+	the way the pet shop code works, or (b) rewrite the pet shop code to
+	specify the room, rather than vnum + 1 hack?  Of course, dropping
+	New Thalos is a good idea too... as is dropping EVERY zone in here.
+
+081112	Quixadhal
+  1228	Merge all the skill utility functions into skills.c.  Right now, some
+	are there, some are in magic.c, and some are in handler.c
+
+081113	Quixadhal
+  1425	I was thinking that the whole skill group system is kindof weird.
+	Why bother to store the groups in your character?  Shouldn't a group
+	just be a set of skills?  If you "add" a group, isn't that just adding
+	each skill in it?  If you "remove" a group, doesn't it just remove all
+	the skills in it (unless they're also part of another group)?
+
+081116	Quixadhal
+  1447	In changing the skill lookup system, I made a slight change to the way
+	things work that MIGHT affect gameplay (hasn't been tested yet).  Namely,
+	I implemented a binary search on the skill array, but in doing so I
+	switched from using str_prefix() to using an exact match by strcasecmp().
+
+	IF the parser relied on skill_lookup() to do prefix matching for commands,
+	this might cause some spells or skills to act differently, since abbreviations
+	like cast 'invis' won't work.  I don't consider that a bug, since it wasn't
+	doing proper globbing anyways (IE: if you did cast 'in', would it match
+	invisibility, or invulnerability?  Undefined and unclear).
+
+	Doing a proper prefix-enabled parser might be in the future.  On the old
+	VAX/VMS system I worked on, you defined things to the degree of matching
+	you wanted to allow... so you could say "INVI*SIBILITY" and "INVU*LNERABILITY".
+	That could be automated if we have a routine that returns ALL matches and if
+	the return set is more than 1 large, it's ambiguous.
+
+  2357	Moving to C++, we'll need to start doing some conversion work before we
+	tackle adding features.  I'll sit down tomorrow and work out a roadmap, but
+	for now assume we want to replace char *'s and funky shared string code with
+	std::string, and apply liberal use of std::list, std::vector, and std::map
+	as appropriate to make the code both clean and safe.
+

@@ -1,0 +1,60 @@
+RaM Project Repository
+
+You find yourself in a room that exudes warmth, a pleasant change
+from the swirling winds outdoors, and can't help but wonder at
+the luck that brought you here today.
+
+The floorboards are highly polished cedar that dance softly to
+the flickering light of the field stone hearth that fills the
+entire south wall opposite the door to the outside.  A few plush
+chairs lounge by the fire, with low mahogany ovals resting beside
+them. A small collection of iron tools hang next to the opening,
+ready to help even the scrawniest human wrestle new logs into
+the fire's maw.
+
+You smell some kind of savoury roast wafting in from what can only
+be a kitchen to the west, and back in the corner you glimpse a
+small stone stairway, leading down to a wine cellar perhaps.  A
+pale orange cat lurks beside the west door, looking up hopefully
+from time to time.
+
+A cheerfully rotund man looks up at your entrance and bellows,
+"Come on in!  Have a seat and I'll fetch you a pint!  Visitors
+are always welcome, especially those with means, if ye catch my
+drift."
+
+...
+
+The RaM project is an attempt to revisit the popular ROM DikuMUD
+derivative, and provide a stable game driver that comes loaded
+with all the building tools you'll need to create the world
+you've always imagined.
+
+To that end, we're following a strategy of fit and polish.  We
+will make every effort to fix any bugs, first and foremost!  You
+shouldn't have to struggle with a poorly coded driver to get your
+vision off the ground.
+
+We'll do our best to document things, both within the game, and
+in separate documents that describe how THIS game driver works,
+not how some former version used to work years ago.
+
+You won't find a lot of game-play features here, just enough for
+it to feel like the familiar ROM system we're evolving from, but
+we hope you WILL find all the building tools you need without
+having to search the archives for add-ons.
+
+No game driver will do everything you want out of the box, thus
+we're adopting new technologies to make the source code easier to
+follow, and thus easier to modify and adapt to YOUR needs.
+
+Right now, you'll find the classic C version of our project in
+the Ice directory.  Soon, a new C++ enhanced version will appear
+in the Fire directory.  Various in-progress works might be found
+under the branches directory, but those are not for the faint of
+heart!
+
+We hope you enjoy your stay here, and if there's anything we can
+do to make things work better, please let us know!
+
+                                                 -Dread Quixadhal
